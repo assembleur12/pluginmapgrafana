@@ -1,0 +1,63 @@
+networks:
+  loki_network:
+
+services:
+  grafana:
+    user: root
+    container_name: 'rhopenlabs-mapgeorh-panel'
+
+    build:
+      context: ./.config
+      args:
+        grafana_image: ${GRAFANA_IMAGE:-grafana-enterprise}
+        grafana_version: ${GRAFANA_VERSION:-11.3.0}
+        development: ${DEVELOPMENT:-false}
+    ports:
+      - 3002:3000/tcp
+    volumes:
+      - ./dist:/var/lib/grafana/plugins/rhopenlabs-mapgeorh-panel
+      - ./provisioning:/etc/grafana/provisioning
+      - .:/root/rhopenlabs-mapgeorh-panel
+
+    environment:
+      NODE_ENV: development
+      GF_LOG_FILTERS: plugin.rhopenlabs-geomapdynamic-panel:debug
+      GF_LOG_LEVEL: debug
+      GF_DATAPROXY_LOGGING: 1
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: rhopenlabs-geomapdynamic-panel
+    networks:
+      - loki_network
+
+  loki:
+    image: grafana/loki:2.9.2
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - loki_network
+
+  # lokis:
+  #   image: grafana/loki:2.9.2
+  #   container_name: lokis
+  #   ports:
+  #     - '3100:3100'
+  #   command: -config.expand-env=true
+  #   networks:
+  #     - loki_network
+  #   environment:
+  #     NODE_ENV: development
+  #     GF_LOG_FILTERS: plugin.rhopenlabs-mapgeorh-panel:debug
+  #     GF_LOG_LEVEL: debug
+  #     GF_DATAPROXY_LOGGING: 1
+  #     GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: rhopenlabs-mapgeorh-panel
+
+  # Service Promtail
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log # Permet à Promtail de lire les logs du système hôte
+      - ./promtail-config.yml:/etc/promtail/config.yml # Chemin vers le fichier de configuration
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - loki_network
